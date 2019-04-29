@@ -45,7 +45,7 @@ ES_INT = 0, 0, 0, 0
 # ES_INT = 0xfffffffe, 0, 0, 0
 # ES_INT = 0xfefefefe, 0xfefefefe, 0xfefefefe, 0xfefefefe
 
-ES_STR = ":".join("%08x" % e for e in ES_INT)
+ES_STR = ".".join("%08x" % e for e in ES_INT)
 ES = [Vector(tobin(e, BITS)) for e in ES_INT]
 
 print "CARRI-ES:", ES_STR

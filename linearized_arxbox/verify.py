@@ -19,14 +19,14 @@ for fname in fnames:
         bits, const, es = info.split("_")
     except ValueError:
         bits, const = info.split("_")
-        es = "0:0:0:0"
+        es = "0.0.0.0"
 
     if BITS != int(bits):
         continue
 
     C = int(const, 16)
-    ES_INT = tuple(int(e, 16) for e in es.split(":"))
-    ES_STR = ":".join("%08x" % e for e in ES_INT)
+    ES_INT = tuple(int(e, 16) for e in es.split("."))
+    ES_STR = ".".join("%08x" % e for e in ES_INT)
     ES = [Vector(tobin(e, BITS)) for e in ES_INT]
 
     try:

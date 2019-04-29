@@ -7,7 +7,7 @@ try:
     cid = int(sys.argv[1])
     C = CS[cid]
     ES_INT = 0, 0, 0, 0
-    ES_STR = ":".join("%08x" % e for e in ES_INT)
+    ES_STR = ".".join("%08x" % e for e in ES_INT)
     fname = "eqs/%d_%08x_%s.txt" % (BITS, C, ES_STR)
 except ValueError:
     # arbitrary carry pattern
@@ -21,9 +21,9 @@ except ValueError:
     bits, const, es = info.split("_")
     assert BITS == int(bits)
     C = int(const, 16)
-    ES_INT = tuple(int(e, 16) for e in es.split(":"))
+    ES_INT = tuple(int(e, 16) for e in es.split("."))
 
-ES_STR = ":".join("%08x" % e for e in ES_INT)
+ES_STR = ".".join("%08x" % e for e in ES_INT)
 ES = [Vector(tobin(e, BITS)) for e in ES_INT]
 
 print "CONST C = %08x (index %d)" % (C, list(CS).index(C))
