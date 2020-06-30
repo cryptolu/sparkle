@@ -1,67 +1,67 @@
 
-main_serial.cpp,90
-#define MAIN 22,568
-void signal_handler(31,857
-void finalize(39,1076
-int main(84,2441
+main_serial.cpp,93
+#define MAIN 39,1331
+void signal_handler(48,1620
+void finalize(56,1839
+int main(101,3204
 
-sparkle_best_trail_search.cpp,387
-#define TRAIL_SEARCH 8,221
-int g_Bn;13,308
-Trail trail;14,319
-uint64_t nNodes;15,333
-uint64_t nNodesPerRound[nNodesPerRound17,365
-uint64_t nNodesPerRoundPerIbit[nNodesPerRoundPerIbit18,396
-uint64_t nPathsPerRoundPerIbit[nPathsPerRoundPerIbit19,449
-bool sparkle_best_trail_search_i(31,847
-bool sparkle_best_trail_search(226,7896
-bool sparkle_best_trail_search_split(248,8429
+sparkle_best_trail_search.cpp,396
+#define TRAIL_SEARCH 25,1001
+int g_Bn;30,1088
+Trail trail;31,1099
+uint64_t nNodes;32,1113
+uint64_t nNodesPerRound[nNodesPerRound34,1145
+uint64_t nNodesPerRoundPerIbit[nNodesPerRoundPerIbit35,1176
+uint64_t nPathsPerRoundPerIbit[nPathsPerRoundPerIbit36,1229
+bool sparkle_best_trail_search_i(48,1627
+bool sparkle_best_trail_search(243,8676
+bool sparkle_best_trail_search_split(265,9209
 
-sparkle_best_trail_search_ibit0.cpp,42
-bool sparkle_best_trail_search_ibit0(1,0
+sparkle_best_trail_search_ibit0.cpp,45
+bool sparkle_best_trail_search_ibit0(18,763
 
-trail.cpp,82
-void fprintTrail(11,243
-void fprintDifferential(26,702
-void clearTrail(52,1490
+trail.cpp,84
+void fprintTrail(28,1006
+void fprintDifferential(43,1465
+void clearTrail(69,2253
 
-defs.h,444
-#define __DEFS_H__8,209
-#define ALL_TRAILS 15,348
-#define POW(17,420
-#define WORD_SIZE 19,457
-	unsigned NROUNDS;36,786
-	uint32_t gconst_r[gconst_r37,806
-	uint32_t gconst_s[gconst_s38,864
-	int g_best_B[g_best_B39,922
-#define WORD_T 56,1388
-#define MASK 63,1482
-#define MASK_NO_MSB 64,1596
-#define GEN_MASK(66,1670
-#define XOR(69,1750
-#define LROT(70,1841
-#define RROT(71,1985
-#define LOG0 73,2132
-#define NROUNDS_MAX 76,2185
+defs.h,452
+#define __DEFS_H__25,989
+#define ALL_TRAILS 32,1128
+#define POW(34,1200
+#define WORD_SIZE 36,1237
+	unsigned NROUNDS;53,1566
+	uint32_t gconst_r[gconst_r54,1586
+	uint32_t gconst_s[gconst_s55,1644
+	int g_best_B[g_best_B56,1702
+#define WORD_T 73,2168
+#define MASK 80,2262
+#define MASK_NO_MSB 81,2376
+#define GEN_MASK(83,2450
+#define XOR(86,2530
+#define LROT(87,2621
+#define RROT(88,2765
+#define LOG0 90,2912
+#define NROUNDS_MAX 93,2965
 
-sparkle_best_trail_search.h,46
-#define __SPARKLE_BEST_TRAIL_SEARCH_H__8,237
+sparkle_best_trail_search.h,48
+#define __SPARKLE_BEST_TRAIL_SEARCH_H__25,1000
 
-trail.h,316
-#define __TRAIL_H__8,207
-    WORD_T dx;17,301
-    WORD_T dy;18,316
-    WORD_T dz;19,331
-    int p;20,346
-    int cp;21,357
-} Differential;22,397
-typedef std::array<Differential,Differential24,414
-typedef std::array<Differential, 100> Trail;24,414
-inline void pushTrail(27,489
-inline void popTrail(37,713
+trail.h,327
+#define __TRAIL_H__25,970
+    WORD_T dx;34,1064
+    WORD_T dy;35,1079
+    WORD_T dz;36,1094
+    int p;37,1109
+    int cp;38,1120
+} Differential;39,1160
+typedef std::array<Differential,Differential41,1177
+typedef std::array<Differential, 100> Trail;41,1177
+inline void pushTrail(44,1252
+inline void popTrail(54,1476
 
-xdp_add.h,114
-#define __XDP_ADD_H__8,242
-inline WORD_T eq(14,322
-inline int xdp_add_lm(21,445
-inline int xdp_add_lm(45,1013
+xdp_add.h,118
+#define __XDP_ADD_H__25,1005
+inline WORD_T eq(31,1085
+inline int xdp_add_lm(38,1208
+inline int xdp_add_lm(62,1776
