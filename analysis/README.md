@@ -1,4 +1,4 @@
-# Sparkle, Esch and Schwaemm
+# Sparkle, Schwaemm and Esch
 
 **Authors:** Christof Beierle, Alex Biryukov, Luan Cardoso dos Santos, Johann Großschädl, Léo Perrin, Aleksei Udovenko, Vesselin Velichkov, and Qingju Wang
 
