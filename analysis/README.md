@@ -4,4 +4,4 @@
 
 This repository contains supporting code for security analysis of the primitives from the [Sparkle suite](https://www.cryptolux.org/index.php/Sparkle), submitted to the NIST Lightweight Cryptography competition.
 
-For more information, we refer to the website [www.cryptolux.org/index.php/Sparkle](https://www.cryptolux.org/index.php/Sparkle) .
+For more information, we refer to the website [sparkle-lwc.github.io](https://sparkle-lwc.github.io/) .
