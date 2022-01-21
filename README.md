@@ -9,15 +9,15 @@ The Sparkle [paper](https://tosc.iacr.org/index.php/ToSC/article/view/8627/8193)
 
 ## Authors: 
 - Christof Beierle, Ruhr University Bochum, Horst Görtz Institute for IT Security, Germany
-- Alex Biryukov, DSC and SnT, University of Luxembourg, Luxembourg
-- Luan Cardoso Dos Santos, DSC and SnT, University of Luxembourg, Luxembourg
-- Johann Johann Großschädl, DSC and SnT, University of Luxembourg, Luxembourg
+- Alex Biryukov, DCS and SnT, University of Luxembourg, Luxembourg
+- Luan Cardoso dos Santos, DCS and SnT, University of Luxembourg, Luxembourg
+- Johann Großschädl, DCS and SnT, University of Luxembourg, Luxembourg
 - Amir Moradi, Ruhr University Bochum, Horst Görtz Institute for IT Security, Germany
 - Léo Perrin, Inria, France
 - Aein Rezaei Shahmirzadi, Ruhr University Bochum, Horst Görtz Institute for IT Security, Germany
 - Aleksei Udovenko, CryptoExperts, France
 - Vesselin Velichkov, University of Edinburgh, United Kingdom
-- Qingju Wang, DSC and SnT, University of Luxembourg, Luxembourg
+- Qingju Wang, DCS and SnT, University of Luxembourg, Luxembourg
 
 ## Content: 
 The repository contains: 
