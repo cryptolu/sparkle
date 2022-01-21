@@ -1,0 +1,147 @@
+#include <inttypes.h>
+
+typedef struct 
+{
+	uint32_t *input;
+	uint32_t input_len;
+	uint32_t brans;
+	uint32_t steps;
+	uint32_t *output;		
+} sparkle_tv;
+
+
+static uint32_t input0[] = {
+   0xd25562d4, 0x20486ff, 0xe79dc073, 0x7b89b4a, 0x1b7a76bb, 0xd584c528, 0x5a42f68a, 0xc732f413
+}; 
+static uint32_t input1[] = {
+   0xd6028757, 0xe1a4919, 0x77946f96, 0x9af1f145, 0x23228df6, 0x7e5a3a61, 0x3ebf103f, 0xce79c8e3, 0x88e1c32d, 0xce3dc89, 0xf68892f6, 0x3fa695db
+}; 
+static uint32_t input2[] = {
+   0x34c80c0f, 0xd06a30e8, 0x9145e2f5, 0x49cb1269, 0xe491a662, 0x820230c4, 0xbc5b0ae6, 0xa22bacf1, 0xf0a95ba, 0xe633f918, 0xbca30085, 0xe5b2214c, 0x162abe8d, 0xef3eb83b, 0x35855469, 0x7f03cf88
+}; 
+static uint32_t input3[] = {
+   0xb06f5ac5, 0xf6b9c57, 0xd3901d2e, 0x724c1b9, 0x92f8fd1b, 0x45001efc, 0x7b822140, 0x6c6ee4d9, 0x90ff2152, 0xf5f6df6e, 0x741b4819, 0x55244c65
+}; 
+static uint32_t input4[] = {
+   0x9b483af3, 0xeb62568, 0x1e73a6ec, 0x604d0534, 0xb5868e11, 0xc690f9d3, 0xe59b7847, 0xe23e409f
+}; 
+static uint32_t input5[] = {
+   0xe6e80503, 0x25a2ab9f, 0xb5713a99, 0x69de06a3, 0x83c9e79f, 0xb96cb9f1, 0xa2e55111, 0xa404e27f
+}; 
+static uint32_t input6[] = {
+   0xbc0e78ce, 0xba02b640, 0xbb9c9463, 0x5ac7c721, 0x3cf0dcd9, 0x812ed7b1, 0xb02405ae, 0x4761c78d, 0x323a4c08, 0x85ffc74a, 0x45f2ba3d, 0x96ee9e5d, 0x3941c7b7, 0xb1a52e08, 0xbc138076, 0x80d71823
+}; 
+static uint32_t input7[] = {
+   0xe1ef461, 0x8bea9f01, 0x7bc024ce, 0x1310549b, 0x6c7ab298, 0xde68bb07, 0x8806aed8, 0x2c90cb08, 0x69f45af0, 0x2d9e8419, 0x233df624, 0x93db8eca, 0x2740e8fd, 0xed485c6c, 0x55edafd8, 0x1939f408
+}; 
+static uint32_t input8[] = {
+   0x6b079cc3, 0x40543e66, 0xf2142383, 0x15921317, 0x95a88ac1, 0xa7368a9b, 0xaad24575, 0x86aac20, 0x57496a47, 0xb2a9ebb6, 0xff169ea2, 0xb3ae9449, 0x7f68253c, 0x5e688fb6, 0x6603d236, 0xef342ffd
+}; 
+static uint32_t input9[] = {
+   0x9cf9b01a, 0x659f85a4, 0xaf73e017, 0xdad10ab0, 0x23b53dbc, 0xa67b9300, 0x25f7417c, 0xf68c795, 0x8f9fa45d, 0xbb11933b, 0x7c0245c1, 0xb1d11dac
+}; 
+
+static uint32_t output0[] = {
+  0xc517bba, 0x4d96359b, 0xb24d2ef1, 0xe1dffa6b, 0xb9364bbb, 0xac8ca987, 0x6903f74b, 0x99ade72f
+}; 
+static uint32_t output1[] = {
+   0x22fdc04a, 0x1509f28, 0x9d784c9e, 0x2ba268a1, 0x1f5396f7, 0xe3fe4fbd, 0xb9ce7474, 0xad4ee8d5, 0x5ef351f1, 0x3895aba7, 0xdf12ba0c, 0x5b672292
+}; 
+static uint32_t output2[] = {
+   0x676a1777, 0x8de82159, 0x96051b90, 0xd3dd6760, 0x2a45b720, 0x573f9d0f, 0x157f8c3c, 0xba5f4a9e, 0x65b86095, 0x47bda613, 0xe1b97875, 0x7e8898a2, 0x1edaf80b, 0x778d03ee, 0xa7278a28, 0x1d973c17 
+}; 
+static uint32_t output3[] = {
+   0x3e5d6221, 0x2e64701f, 0x4d4d4b83, 0xf7816a2c, 0x9120d117, 0xd898c972, 0xa5c16bf4, 0x64ea84e4, 0xb67085e8, 0x4d9d3756, 0xa1519974, 0x459b5a50
+}; 
+static uint32_t output4[] = {
+   0x4238299, 0xfd859aff, 0xb20c543f, 0x7b2a90c9, 0xf23de5aa, 0xd3e30fc3, 0xab712e0a, 0x7ed48277
+}; 
+static uint32_t output5[] = {
+   0x2687e236, 0x40dfb07d, 0xefac7025, 0x8bd556dc, 0x178003a2, 0xc21a9ef9, 0xbf65fc19, 0x30d2e316
+};
+static uint32_t output6[] = {
+   0x852deaeb, 0x38fd22b4, 0x9b5e00e3, 0xc3c33289, 0x592d0171, 0x8c898c87, 0x366a7b8e, 0xc61a80ec, 0xfefe845b, 0x481d5b57, 0xeae66188, 0x5f8918f, 0x7d2956b2, 0xa2732ff6, 0x59a4791c, 0x3eda103e
+}; 
+static uint32_t output7[] = {
+   0xb9def145, 0x344ab744, 0xfe5e8714, 0xae5c5d3d, 0x4dc6cf2d, 0x2db0bbe4, 0x7c948fb5, 0xe0f1633a, 0x9cf07115, 0x1d0b915a, 0x1f6a827a, 0xfc1ee060, 0x88b4a75b, 0x7a8321d2, 0xa4e143af, 0x2fa5a37e
+}; 
+static uint32_t output8[] = {
+   0x4e84f9ed, 0xd7cc4a1a, 0x7121d3c3, 0x17a7b099, 0x6fc2bdd2, 0x347f570c, 0xe6f4cef6, 0x9816c402, 0x8e343028, 0x7bd44889, 0x8e9771a4, 0x94df390f, 0x182a4179, 0x65c77d75, 0xfcb52fb8, 0xe75ffce8
+}; 
+static uint32_t output9[] = {
+   0xb8437cf4, 0xeef60c28, 0xf994f24e, 0x3a03846d, 0xc9dfcdbf, 0xecc9836c, 0xd8de0b27, 0x657c3c9e, 0x8f92846c, 0xb1a5a27b, 0x45d07451, 0x974e9515
+}; 
+
+
+static sparkle_tv vectors[] = {
+	{
+	   .input = input0,
+	   .input_len = 8,
+	   .brans = 4,
+	   .steps = 6, 
+	   .output = output0
+	},
+	{
+	   .input = input1,
+	   .input_len = 12,
+	   .brans = 6,
+	   .steps = 12, 
+	   .output = output1
+	},
+	{
+	   .input = input2,
+	   .input_len = 16,
+	   .brans = 8,
+	   .steps = 6, 
+	   .output = output2
+	},
+	{
+	   .input = input3,
+	   .input_len = 12,
+	   .brans = 6,
+	   .steps = 9, 
+	   .output = output3
+	},
+	{
+	   .input = input4,
+	   .input_len = 8,
+	   .brans = 4,
+	   .steps = 9, 
+	   .output = output4
+	},
+	{
+	   .input = input5,
+	   .input_len = 8,
+	   .brans = 4,
+	   .steps = 6, 
+	   .output = output5
+	},
+	{
+	   .input = input6,
+	   .input_len = 16,
+	   .brans = 8,
+	   .steps = 9, 
+	   .output = output6
+	},
+	{
+	   .input = input7,
+	   .input_len = 16,
+	   .brans = 8,
+	   .steps = 9, 
+	   .output = output7
+	},
+	{
+	   .input = input8,
+	   .input_len = 16,
+	   .brans = 8,
+	   .steps = 9, 
+	   .output = output8
+	},
+	{
+	   .input = input9,
+	   .input_len = 12,
+	   .brans = 6,
+	   .steps = 12, 
+	   .output = output9
+	}
+};
