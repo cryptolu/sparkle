@@ -11,7 +11,7 @@ The Sparkle [paper](https://tosc.iacr.org/index.php/ToSC/article/view/8627/8193)
 - Christof Beierle, Ruhr University Bochum, Horst Görtz Institute for IT Security, Germany
 - Alex Biryukov, DSC and SnT, University of Luxembourg, Luxembourg
 - Luan Cardoso Dos Santos, DSC and SnT, University of Luxembourg, Luxembourg
-- Johann Johann Großschädl, DSC and SnT, University of Luxembourg, Luxembourg
+- Johann Großschädl, DSC and SnT, University of Luxembourg, Luxembourg
 - Amir Moradi, Ruhr University Bochum, Horst Görtz Institute for IT Security, Germany
 - Léo Perrin, Inria, France
 - Aein Rezaei Shahmirzadi, Ruhr University Bochum, Horst Görtz Institute for IT Security, Germany
