@@ -82,7 +82,7 @@
 #if (defined(__AVR) || defined(__AVR__)) && defined(SPARKLE_ASSEMBLER)
 extern void sparkle_avr(uint32_t *state, int brans, int steps);
 #define sparkle(state, brans, steps) sparkle_avr((state), (brans), (steps))
-#endif // if defined(__AVR__) && ...
+#endif // if (defined(__AVR__) || ...
 
 
 // When this file is compiled for a MSP430 (or a MSP430X) microcontroller and
@@ -98,9 +98,9 @@ extern void sparkle_msp(uint32_t *state, int brans, int steps);
 
 
 // When this file is compiled for an ARM microcontroller and SPARKLE_ASSEMBLER
-// is defined (see esch.h), then one of the three branch-unrolled ARMv7M
-// assembler implementations of the SPARKLE permutation is used, depending on
-// the concrete ESCH instance. On the other hand, if SPARKLE_ASSEMBLER is not
+// is defined (see esch.h), then one of the two branch-unrolled ARM assembler
+// implementations of the SPARKLE permutation is used, depending on the
+// concrete ESCH instance. On the other hand, if SPARKLE_ASSEMBLER is not
 // defined, then the C version (i.e. the function sparkle) is used.
 
 #if (defined(__arm__) || defined(_M_ARM)) && defined(SPARKLE_ASSEMBLER)
@@ -111,7 +111,25 @@ extern void sparkle384_arm(uint32_t *state, int steps);
 extern void sparkle512_arm(uint32_t *state, int steps);
 #define sparkle(state, brans, steps) sparkle512_arm((state), (steps))
 #endif // if (STATE_BYTES == 48)
-#endif // if defined(__arm__) && ...
+#endif // if (defined(__arm__) || ...
+
+
+// When this file is compiled for a 32-bit RISC-V microcontroller (e.g. RV32I)
+// and SPARKLE_ASSEMBLER is defined (see esch.h), then one of the two
+// branch-unrolled RV32 assembler implementations of the SPARKLE permutation is
+// used, depending on the concrete ESCH instance. On the other hand, if
+// SPARKLE_ASSEMBLER is not defined, then the C version (i.e. the function
+// sparkle) is used.
+
+#if defined(__riscv_xlen) && (__riscv_xlen == 32) && defined(SPARKLE_ASSEMBLER)
+#elif (STATE_BYTES == 48)
+extern void sparkle384_rv32(uint32_t *state, int steps);
+#define sparkle(state, brans, steps) sparkle384_rv32((state), (steps))
+#elif (STATE_BYTES == 64)
+extern void sparkle512_rv32(uint32_t *state, int steps);
+#define sparkle(state, brans, steps) sparkle512_rv32((state), (steps))
+#endif // if (STATE_BYTES == 48)
+#endif // if defined(__riscv_xlen) && ...
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -275,7 +293,7 @@ void ProcessMessage(uint32_t *state, const uint8_t *in, size_t inlen)
 
 // The Finalize function generates the message digest by "squeezing" (i.e. by
 // calling SPARKLE with a slim number of steps) until the digest has reached a
-// byte-length of DIGEST_BYTES.
+// byte-length of ESCH_DIGEST_BYTES.
 
 void Finalize(uint32_t *state, uint8_t *out)
 {
