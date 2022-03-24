@@ -1,6 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
-// sparkle384_32i.S: RV32I assembly implementation  (GCC) of SPARKLE384.     //
-// This file is part of the SPARKLE package to the NIST LWC standardization. //
+// sparkle384_32i.S: RV32I assembler implementation (GCC) of SPARKLE384.     //
+// This file is part of the SPARKLE package that was sent to NIST during the //
+// 3rd round of the Lightweight Cryptography (LWC) standardization project.  //
 // Version 1.1.2 (18-Oct-21), see <http://github.com/cryptolu/> for updates. //
 // Authors: the SPARKLE group (Christof Beierle, Alex Biryukov, Luan Cardoso //
 // dos Santos, Johann Groszschaedl, Amir Moradi, Leo Perrin, Aein Rezaei     //
@@ -167,7 +168,7 @@
 
 
 // operation B = B + (A >>> dist)
-.macro ADDROR bw:req, aw:req, dist:req
+.macro RORADD bw:req, aw:req, dist:req
 #if (defined(__riscv_zbb) || defined(__riscv_zbkb))
     rori    trr, \aw, \dist
 #else  // rotate instructions not supported
@@ -180,7 +181,7 @@
 
 
 // operation B = B ^ (A >>> dist)
-.macro XORROR bw:req, aw:req, dist:req
+.macro RORXOR bw:req, aw:req, dist:req
 #if (defined(__riscv_zbb) || defined(__riscv_zbkb))
     rori    trr, \aw, \dist
 #else  // rotate instructions not supported
@@ -193,30 +194,30 @@
 
 
 // complete ARX-box (Alzette)
-.macro ARX_BOX xi:req, yi:req, ci:req
-    ADDROR  \xi, \yi, 31    // X = X + (Y >>> 31)
-    XORROR  \yi, \xi, 24    // Y = Y ^ (X >>> 24)
+.macro ARXBOX xi:req, yi:req, ci:req
+    RORADD  \xi, \yi, 31    // X = X + (Y >>> 31)
+    RORXOR  \yi, \xi, 24    // Y = Y ^ (X >>> 24)
     xor     \xi, \xi, \ci   // X = X ^ RCON
-    ADDROR  \xi, \yi, 17    // X = X + (Y >>> 17)
-    XORROR  \yi, \xi, 17    // Y = Y ^ (X >>> 17)
+    RORADD  \xi, \yi, 17    // X = X + (Y >>> 17)
+    RORXOR  \yi, \xi, 17    // Y = Y ^ (X >>> 17)
     xor     \xi, \xi, \ci   // X = X ^ RCON
     add     \xi, \xi, \yi   // X = X + Y
-    XORROR  \yi, \xi, 31    // Y = Y ^ (X >>> 31)
+    RORXOR  \yi, \xi, 31    // Y = Y ^ (X >>> 31)
     xor     \xi, \xi, \ci   // X = X ^ RCON
-    ADDROR  \xi, \yi, 24    // X = X + (Y >>> 24)
-    XORROR  \yi, \xi, 16    // Y = Y ^ (X >>> 16)
+    RORADD  \xi, \yi, 24    // X = X + (Y >>> 24)
+    RORXOR  \yi, \xi, 16    // Y = Y ^ (X >>> 16)
     xor     \xi, \xi, \ci   // X = X ^ RCON
 .endm
 
 
 // complete non-linear layer
 .macro ARXBOX_LAYER_384
-    ARX_BOX x0w, y0w, c0w
-    ARX_BOX x1w, y1w, c1w
-    ARX_BOX x2w, y2w, c2w
-    ARX_BOX x3w, y3w, c3w
-    ARX_BOX x4w, y4w, c4w
-    ARX_BOX x5w, y5w, c5w
+    ARXBOX  x0w, y0w, c0w
+    ARXBOX  x1w, y1w, c1w
+    ARXBOX  x2w, y2w, c2w
+    ARXBOX  x3w, y3w, c3w
+    ARXBOX  x4w, y4w, c4w
+    ARXBOX  x5w, y5w, c5w
 .endm
 
 
@@ -268,15 +269,15 @@
 .type sparkle384_rv32, %function
 .func sparkle384_rv32
 sparkle384_rv32:
-    PROLOGUE_384                // push callee-saved registers and load state
-    mv cnt, zero                // initialize step-counter cnt
-.Lloop_384:                     // start of loop
-    ADD_STEP_CNT_384            // macro to add step-counter to state
-    ARXBOX_LAYER_384            // macro for the ARXBOX layer
-    LINEAR_LAYER_384            // macro for the linear layer
-    addi cnt, cnt, 1            // increment step-counter cnt
-    bne cnt, step, .Lloop_384   // branch to start of loop if cnt != steps
-    EPILOGUE_384                // store state and pop callee-saved registers
+    PROLOGUE_384            // push callee-saved registers and load state
+    mv cnt, zero            // initialize step-counter cnt
+.Lmloop:                    // start of main-loop
+    ADD_STEP_CNT_384        // macro to add step-counter to state
+    ARXBOX_LAYER_384        // macro for the ARXBOX layer
+    LINEAR_LAYER_384        // macro for the linear layer
+    addi cnt, cnt, 1        // increment step-counter cnt
+    bne cnt, step, .Lmloop  // branch to start of main-loop if cnt != steps
+    EPILOGUE_384            // store state and pop callee-saved registers
 .endfunc
 
 
