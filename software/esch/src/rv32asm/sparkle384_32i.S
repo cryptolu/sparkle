@@ -54,8 +54,8 @@
 
 // register sptr holds the start address of array `state`
 #define sptr a0
-// register step holds the number of steps (parameter `steps`)
-#define step a1
+// register steps holds the number of steps (parameter `steps`)
+#define steps a1
 // registers x0w to y5w hold 12 words from array `state`
 #define x0w a2
 #define y0w a3
@@ -80,8 +80,8 @@
 #define c5w s6
 // register cptr holds the start address of array `rcon`
 #define cptr s7
-// register cnt holds the step-counter (for loop termination)
-#define cnt s8
+// register scnt holds the step-counter (for loop termination)
+#define scnt s8
 // register trr serves as temporary register for rotations
 #define trr s9
 
@@ -162,7 +162,7 @@
 .macro ADD_STEP_CNT_384
     lw      txy, 0(cptr)
     add     cptr, cptr, 4
-    xor     y1w, y1w, cnt
+    xor     y1w, y1w, scnt
     xor     y0w, y0w, txy
 .endm
 
@@ -270,13 +270,13 @@
 .func sparkle384_rv32
 sparkle384_rv32:
     PROLOGUE_384            // push callee-saved registers and load state
-    mv cnt, zero            // initialize step-counter cnt
-.Lmloop:                    // start of main-loop
-    ADD_STEP_CNT_384        // macro to add step-counter to state
+    mv scnt, zero           // initialize step-counter scnt
+.LSTEPLOOP:                 // start of step-loop
+    ADD_STEP_CNT_384        // macro to add step-counter and rcon to state
     ARXBOX_LAYER_384        // macro for the ARXBOX layer
     LINEAR_LAYER_384        // macro for the linear layer
-    addi cnt, cnt, 1        // increment step-counter cnt
-    bne cnt, step, .Lmloop  // branch to start of main-loop if cnt != steps
+    addi scnt, scnt, 1      // increment step-counter scnt
+    bne scnt, steps, .LSTEPLOOP // branch to start of loop if scnt != steps
     EPILOGUE_384            // store state and pop callee-saved registers
 .endfunc
 
