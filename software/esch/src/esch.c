@@ -77,7 +77,7 @@
 // When this file is compiled for an AVR microcontroller and SPARKLE_ASSEMBLER
 // is defined (see esch.h), then the AVR assembler implementation of the
 // SPARKLE permutation is used. On the other hand, if SPARKLE_ASSEMBLER is not
-// defined, then the C version (i.e. the function sparkle) is used.
+// defined, then the C version (i.e. the function `sparkle`) is used.
 
 #if (defined(__AVR) || defined(__AVR__)) && defined(SPARKLE_ASSEMBLER)
 extern void sparkle_avr(uint32_t *state, int brans, int steps);
@@ -89,7 +89,7 @@ extern void sparkle_avr(uint32_t *state, int brans, int steps);
 // SPARKLE_ASSEMBLER is defined (see esch.h), then the MSP430 assembler
 // implementation of the SPARKLE permutation is used. On the other hand, if
 // SPARKLE_ASSEMBLER is not defined, then the C version (i.e. the function
-// sparkle) is used.
+// `sparkle`) is used.
 
 #if (defined(MSP430) || defined(__MSP430__)) && defined(SPARKLE_ASSEMBLER)
 extern void sparkle_msp(uint32_t *state, int brans, int steps);
@@ -97,11 +97,29 @@ extern void sparkle_msp(uint32_t *state, int brans, int steps);
 #endif // if (defined(MSP430) || ...
 
 
+// When this file is compiled for a 32-bit RISC-V microcontroller (e.g. RV32I)
+// and SPARKLE_ASSEMBLER is defined (see esch.h), then one of the two
+// branch-unrolled RV32 assembler implementations of the SPARKLE permutation is
+// used, depending on the concrete ESCH instance. On the other hand, if
+// SPARKLE_ASSEMBLER is not defined, then the C version (i.e. the function
+// `sparkle`) is used.
+
+#if defined(__riscv_xlen) && (__riscv_xlen == 32) && defined(SPARKLE_ASSEMBLER)
+#if (STATE_BYTES == 48)
+extern void sparkle384_rv32(uint32_t *state, int steps);
+#define sparkle(state, brans, steps) sparkle384_rv32((state), (steps))
+#elif (STATE_BYTES == 64)
+extern void sparkle512_rv32(uint32_t *state, int steps);
+#define sparkle(state, brans, steps) sparkle512_rv32((state), (steps))
+#endif // if (STATE_BYTES == 48)
+#endif // if defined(__riscv_xlen) && ...
+
+
 // When this file is compiled for an ARM microcontroller and SPARKLE_ASSEMBLER
 // is defined (see esch.h), then one of the two branch-unrolled ARM assembler
 // implementations of the SPARKLE permutation is used, depending on the
 // concrete ESCH instance. On the other hand, if SPARKLE_ASSEMBLER is not
-// defined, then the C version (i.e. the function sparkle) is used.
+// defined, then the C version (i.e. the function `sparkle`) is used.
 
 #if (defined(__arm__) || defined(_M_ARM)) && defined(SPARKLE_ASSEMBLER)
 #if (STATE_BYTES == 48)
@@ -114,22 +132,22 @@ extern void sparkle512_arm(uint32_t *state, int steps);
 #endif // if (defined(__arm__) || ...
 
 
-// When this file is compiled for a 32-bit RISC-V microcontroller (e.g. RV32I)
-// and SPARKLE_ASSEMBLER is defined (see esch.h), then one of the two
-// branch-unrolled RV32 assembler implementations of the SPARKLE permutation is
-// used, depending on the concrete ESCH instance. On the other hand, if
-// SPARKLE_ASSEMBLER is not defined, then the C version (i.e. the function
-// sparkle) is used.
+// In all ARMv7 architectures, including ARMv7-M, unaligned data access is
+// available (and is the default), whereas ARMv6-M (e.g. Cortex-M0/M0+) and
+// ARMv8-M baseline (e.g. Cortex-M23) require strict alignment, which means
+// the address of a 32-bit integer must be a multiple of four. The following
+// preprocessor directives set the identifier ALIGN_OF_UI32 to 1 (see below
+// for an explanation) when this file is compiled for an ARMv7 device.
 
-#if defined(__riscv_xlen) && (__riscv_xlen == 32) && defined(SPARKLE_ASSEMBLER)
-#elif (STATE_BYTES == 48)
-extern void sparkle384_rv32(uint32_t *state, int steps);
-#define sparkle(state, brans, steps) sparkle384_rv32((state), (steps))
-#elif (STATE_BYTES == 64)
-extern void sparkle512_rv32(uint32_t *state, int steps);
-#define sparkle(state, brans, steps) sparkle512_rv32((state), (steps))
-#endif // if (STATE_BYTES == 48)
-#endif // if defined(__riscv_xlen) && ...
+#ifndef ALIGN_OF_UI32
+#if defined(__arm__) || defined(_M_ARM)
+#if ((__ARM_ARCH == 7) && (__ARM_ARCH_ISA_THUMB == 2)) ||     \
+  ((__TARGET_ARCH_ARM == 7) && (__TARGET_ARCH_THUMB == 4)) || \
+  ((__TARGET_ARCH_ARM == 0) && (__TARGET_ARCH_THUMB == 4))
+#define ALIGN_OF_UI32 1
+#endif // if ((__ARM_ARCH == 7) && ..
+#endif // if defined(__arm__) || ...
+#endif // ifndef ALIGN_OF_UI32
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -151,9 +169,7 @@ extern void sparkle512_rv32(uint32_t *state, int steps);
 // can be used to determine the alignment requirements an unsigned-char-pointer
 // has to meet to permit casting to an uint32_t-pointer.
 
-#if defined(_MSC_VER) && (_MSC_VER < 1600)
-#define ALIGN_OF_UI32 4
-#else  // compiler is not ancient MSVC
+#ifndef ALIGN_OF_UI32
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)  // C11
 #include <stdalign.h>
 #define ALIGN_OF_UI32 alignof(uint32_t)
@@ -161,7 +177,7 @@ extern void sparkle512_rv32(uint32_t *state, int steps);
 #define MIN_SIZE(a, b) ((sizeof(a) < sizeof(b)) ? sizeof(a) : sizeof(b))
 #define ALIGN_OF_UI32 MIN_SIZE(uint32_t, uint_fast8_t)  // stdint.h
 #endif // if defined(__STDC_VERSION__) && ...
-#endif // defined(_MSC_VER) && ...
+#endif // ifndef ALIGN_OF_UI32
 
 
 // Injection of a 16-byte block of the message to the state. According to the
