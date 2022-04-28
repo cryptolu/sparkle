@@ -145,18 +145,26 @@ void clear_state(uint32_t *state, int brans)
 
 void print_state(const uint32_t *state, int brans)
 {
+  uint8_t buffer[18*MAX_BRANCHES];
   uint8_t *sbytes = (uint8_t *) state;
-  int i, j;
+  uint8_t byte;
+  int i, j, k = 0;
   
-  for (i = 0; i < brans; i ++) {
-    j = 8*i;
-    printf("(%02x%02x%02x%02x %02x%02x%02x%02x)",       \
-    sbytes[j],   sbytes[j+1], sbytes[j+2], sbytes[j+3], \
-    sbytes[j+4], sbytes[j+5], sbytes[j+6], sbytes[j+7]);
-    if (i < brans-1) printf(" ");
+  for (i = 0; i < 2*brans; i ++) {
+    for (j = 0; j < 4; j ++) {
+      byte = sbytes[4*i+j] >> 4;
+      // replace 87 by 55 to get uppercase letters
+      buffer[k++] = byte + ((byte < 10) ? 48 : 87);
+      byte = sbytes[4*i+j] & 15;
+      // replace 87 by 55 to get uppercase letters
+      buffer[k++] = byte + ((byte < 10) ? 48 : 87);
+    }
+    buffer[k++] = ' ';
   }
-  printf("\n");
-}
+  buffer[k-1] = '\0';
+  
+  printf("%s\n", buffer);
+} // <- breakpoint !!!
 
 
 void test_sparkle(int brans, int steps)
