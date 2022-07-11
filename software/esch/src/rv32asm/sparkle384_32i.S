@@ -385,9 +385,9 @@ sparkle384_rv32:
 // `FEISWAP` macro for the size-optimized implementation, this version does not
 // include the swap of the left-side and right-side words. The right-side word
 // `r2` is actually stored in register `tmp`, which means register `r2` is free
-// and can be immediately used as target register for the swap. Note that this
-// macro has to be executed twice: once with the x-words and then a second time
-// with the y-words.
+// and can be immediately used as target register for the rotation. Note that
+// this macro has to be executed twice: once with the x-words and then a second
+// time with the y-words.
 
 .macro FEISWAP l0:req, l1:req, l2:req, r0:req, r1:req, r2:req
     xor     \r2, \r0, \l0
