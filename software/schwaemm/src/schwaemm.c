@@ -107,10 +107,10 @@ extern void sparkle_avr(uint32_t *state, int brans, int steps);
 // SPARKLE_ASSEMBLER is not defined, then the C version (i.e. the function
 // `sparkle`) is used.
 
-#if (defined(MSP430) || defined(__MSP430__)) && defined(SPARKLE_ASSEMBLER)
+#if (defined(__MSP430__) || defined(__ICC430__)) && defined(SPARKLE_ASSEMBLER)
 extern void sparkle_msp(uint32_t *state, int brans, int steps);
 #define sparkle(state, brans, steps) sparkle_msp((state), (brans), (steps))
-#endif // if (defined(MSP430) || ...
+#endif // if (defined(__MSP430__) || ...
 
 
 // When this file is compiled for a 32-bit RISC-V microcontroller (e.g. RV32I)
@@ -154,24 +154,6 @@ extern void sparkle512_arm(uint32_t *state, int steps);
 #endif // if (defined(__arm__) || ...
 
 
-// In all ARMv7 architectures, including ARMv7-M, unaligned data access is
-// available (and is the default), whereas ARMv6-M (e.g. Cortex-M0/M0+) and
-// ARMv8-M baseline (e.g. Cortex-M23) require strict alignment, which means
-// the address of a 32-bit integer must be a multiple of four. The following
-// preprocessor directives set the identifier ALIGN_OF_UI32 to 1 (see below
-// for an explanation) when this file is compiled for an ARMv7 device.
-
-#ifndef ALIGN_OF_UI32
-#if defined(__arm__) || defined(_M_ARM)
-#if ((__ARM_ARCH == 7) && (__ARM_ARCH_ISA_THUMB == 2)) ||     \
-  ((__TARGET_ARCH_ARM == 7) && (__TARGET_ARCH_THUMB == 4)) || \
-  ((__TARGET_ARCH_ARM == 0) && (__TARGET_ARCH_THUMB == 4))
-#define ALIGN_OF_UI32 1
-#endif // if ((__ARM_ARCH == 7) && ..
-#endif // if defined(__arm__) || ...
-#endif // ifndef ALIGN_OF_UI32
-
-
 ///////////////////////////////////////////////////////////////////////////////
 /////// HELPER FUNCTIONS AND MACROS (RHO1, RHO2, RATE-WHITENING, ETC.) ////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -180,42 +162,38 @@ extern void sparkle512_arm(uint32_t *state, int steps);
 // The high-level AEAD API specifies that the associated data, plaintext, and
 // ciphertext are stored in arrays of type unsigned char. However, the SPARKLE
 // permutation operates on 32-bit words and performs best when the data to be
-// processed is stored in an uint32_t-array. Casting an unsigned-char pointer
-// to an uint32_t-pointer increases the alignment requirements, i.e. the base
-// address of the array must be even on 16-bit architectures and a multiple of
-// four (i.e. 4-byte aligned) on 32-bit and 64-bit platforms. The preprocessor
-// statements below can be used to determine the alignment requirements an
-// unsigned-char-pointer has to meet to permit casting to an uint32_t-pointer.
+// processed is stored in an uint32_t-array. Casting an unsigned-char-pointer
+// to a uint32_t-pointer is only permitted if the pointer is properly aligned,
+// which means the address must be even on 16-bit architectures and a multiple
+// of four (i.e. 4-byte aligned) on 32-bit and 64-bit platforms, though there
+// exist also architectures that can handle unaligned RAM accesses, e.g. Intel
+// X86/X64 and ARM Cortex-M3/M4. The following preprocessor statements try to
+// determine the alignment requirements that an unsigned-char-pointer needs to
+// satisfy to allow casting to a uint32_t-pointer. Unfortunately, there is no
+// clean way to do this with pre-C11 compilers, but to be on the safe side the
+// required alignment can be assumed to be the processor's word-size or to the
+// size of uint32_t, whichever value is smaller. While this approach reliably
+// prevents unaligned RAM accesses, it may be overly conservative and increase
+// the execution time, in particular on architectures that do not have strict
+// alignment requirements.
 
 #ifndef ALIGN_OF_UI32
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)  // C11
 #include <stdalign.h>
 #define ALIGN_OF_UI32 alignof(uint32_t)
-#else  // C11 standard is not available
+#else  // C11 standard is not supported
 #define MIN_SIZE(a, b) ((sizeof(a) < sizeof(b)) ? sizeof(a) : sizeof(b))
 #define ALIGN_OF_UI32 MIN_SIZE(uint32_t, uint_fast8_t)  // stdint.h
 #endif // if defined(__STDC_VERSION__) && ...
 #endif // ifndef ALIGN_OF_UI32
 
 
-// The rate-whitening for SCHWAEMM256_128 applies the "tweak" described in
-// Section 2.3.2 of the specification. Therefore, the indices used to load the
-// 32-bit words from the capacity-part of the state need to be reduced modulo
-// CAP_WORDS, which the C implementation below does by ANDing the index with
-// (CAP_WORDS - 1) = 3. Performing the modulo reduction in this way only works
-// when CAP_WORDS is a power of 2, which is the case for SCHWAEMM256_128.
-
-#if (RATE_WORDS > CAP_WORDS)
-#define CAP_INDEX(i) ((i) & (CAP_WORDS-1))
-#else  // RATE_WORDS <= CAP_WORDS
-#define CAP_INDEX(i) (i)
-#endif
-
-
 // Rho and rate-whitening for the authentication of associated data. The third
 // parameter indicates whether the uint8_t-pointer `in` is properly aligned to
 // permit casting to a uint32_t-pointer. If this is the case then array `in` is
-// processed directly, otherwise it is first copied to an aligned buffer.
+// processed directly, otherwise it is first copied to an aligned buffer. This
+// implementation supports any SCHWAEMM instance with RATE_WORDS == CAP_WORDS
+// and RATE_WORDS == 2*CAP_WORDS.
 
 static void rho_whi_aut(uint32_t *state, const uint8_t *in, int aligned)
 {
@@ -234,14 +212,15 @@ static void rho_whi_aut(uint32_t *state, const uint8_t *in, int aligned)
   for (i = 0, j = RATE_WORDS/2; i < RATE_WORDS/2; i++, j++) {
     tmp = state[i];
     state[i] = state[j] ^ in32[i] ^ state[RATE_WORDS+i];
-    state[j] ^= tmp ^ in32[j] ^ state[RATE_WORDS+CAP_INDEX(j)];
+    state[j] ^= tmp ^ in32[j] ^ state[(STATE_WORDS-RATE_WORDS/2)+i];
   }
 }
 
 
 // Rho and rate-whitening for the authentication of the last associated-data
-// block. Since this last block may require padding, it is always copied to a
-// buffer.
+// block. Since the last block may require padding, it is always copied to a
+// buffer. This implementation supports any SCHWAEMM instance with RATE_WORDS
+// == CAP_WORDS and RATE_WORDS == 2*CAP_WORDS.
 
 static void rho_whi_aut_last(uint32_t *state, const uint8_t *in, size_t inlen)
 {
@@ -250,17 +229,17 @@ static void rho_whi_aut_last(uint32_t *state, const uint8_t *in, size_t inlen)
   uint32_t tmp;
   int i, j;
   
-  memcpy(buffer, in, inlen);
   if (inlen < RATE_BYTES) {  // padding
     bufptr = ((uint8_t *) buffer) + inlen;
-    memset(bufptr, 0, (RATE_BYTES - inlen));
+    memset(buffer, 0, RATE_BYTES);
     *bufptr = 0x80;
   }
+  memcpy(buffer, in, inlen);
   
   for (i = 0, j = RATE_WORDS/2; i < RATE_WORDS/2; i++, j++) {
     tmp = state[i];
     state[i] = state[j] ^ buffer[i] ^ state[RATE_WORDS+i];
-    state[j] ^= tmp ^ buffer[j] ^ state[RATE_WORDS+CAP_INDEX(j)];
+    state[j] ^= tmp ^ buffer[j] ^ state[(STATE_WORDS-RATE_WORDS/2)+i];
   }
 }
 
@@ -269,7 +248,8 @@ static void rho_whi_aut_last(uint32_t *state, const uint8_t *in, size_t inlen)
 // indicates whether the uint8_t-pointers `in` and `out` are properly aligned
 // to permit casting to uint32_t-pointers. If this is the case then array `in`
 // and `out` are processed directly, otherwise `in` is copied to an aligned
-// buffer.
+// buffer. This implementation supports any SCHWAEMM instance with RATE_WORDS
+// == CAP_WORDS and RATE_WORDS == 2*CAP_WORDS.
 
 static void rho_whi_enc(uint32_t *state, uint8_t *out, const uint8_t *in, \
   int aligned)
@@ -291,7 +271,7 @@ static void rho_whi_enc(uint32_t *state, uint8_t *out, const uint8_t *in, \
     tmp1 = state[i];
     tmp2 = state[j];
     state[i] = state[j] ^ in32[i] ^ state[RATE_WORDS+i];
-    state[j] ^= tmp1 ^ in32[j] ^ state[RATE_WORDS+CAP_INDEX(j)];
+    state[j] ^= tmp1 ^ in32[j] ^ state[(STATE_WORDS-RATE_WORDS/2)+i];
     out32[i] = in32[i] ^ tmp1;
     out32[j] = in32[j] ^ tmp2;
   }
@@ -303,7 +283,9 @@ static void rho_whi_enc(uint32_t *state, uint8_t *out, const uint8_t *in, \
 
 
 // Rho and rate-whitening for the encryption of the last plaintext block. Since
-// this last block may require padding, it is always copied to a buffer.
+// the last block may require padding, it is always copied to a buffer. This
+// implementation supports any SCHWAEMM instance with RATE_WORDS == CAP_WORDS
+// and RATE_WORDS == 2*CAP_WORDS.
 
 static void rho_whi_enc_last(uint32_t *state, uint8_t *out, const uint8_t *in, \
   size_t inlen)
@@ -313,18 +295,18 @@ static void rho_whi_enc_last(uint32_t *state, uint8_t *out, const uint8_t *in, \
   uint8_t *bufptr;
   int i, j;
   
-  memcpy(buffer, in, inlen);
   if (inlen < RATE_BYTES) {  // padding
     bufptr = ((uint8_t *) buffer) + inlen;
-    memset(bufptr, 0, (RATE_BYTES - inlen));
+    memset(buffer, 0, RATE_BYTES);
     *bufptr = 0x80;
   }
+  memcpy(buffer, in, inlen);
   
   for (i = 0, j = RATE_WORDS/2; i < RATE_WORDS/2; i++, j++) {
     tmp1 = state[i];
     tmp2 = state[j];
     state[i] = state[j] ^ buffer[i] ^ state[RATE_WORDS+i];
-    state[j] ^= tmp1 ^ buffer[j] ^ state[RATE_WORDS+CAP_INDEX(j)];
+    state[j] ^= tmp1 ^ buffer[j] ^ state[(STATE_WORDS-RATE_WORDS/2)+i];
     buffer[i] ^= tmp1;
     buffer[j] ^= tmp2;
   }
@@ -336,7 +318,8 @@ static void rho_whi_enc_last(uint32_t *state, uint8_t *out, const uint8_t *in, \
 // indicates whether the uint8_t-pointers `in` and `out` are properly aligned
 // to permit casting to uint32_t-pointers. If this is the case then array `in`
 // and `out` are processed directly, otherwise `in` is copied to an aligned
-// buffer.
+// buffer. This implementation supports any SCHWAEMM instance with RATE_WORDS
+// == CAP_WORDS and RATE_WORDS == 2*CAP_WORDS.
 
 static void rho_whi_dec(uint32_t *state, uint8_t *out, const uint8_t *in, \
   int aligned)
@@ -358,7 +341,7 @@ static void rho_whi_dec(uint32_t *state, uint8_t *out, const uint8_t *in, \
     tmp1 = state[i];
     tmp2 = state[j];
     state[i] ^= state[j] ^ in32[i] ^ state[RATE_WORDS+i];
-    state[j] = tmp1 ^ in32[j] ^ state[RATE_WORDS+CAP_INDEX(j)];
+    state[j] = tmp1 ^ in32[j] ^ state[(STATE_WORDS-RATE_WORDS/2)+i];
     out32[i] = in32[i] ^ tmp1;
     out32[j] = in32[j] ^ tmp2;
   }
@@ -370,7 +353,9 @@ static void rho_whi_dec(uint32_t *state, uint8_t *out, const uint8_t *in, \
 
 
 // Rho and rate-whitening for the decryption of the last ciphertext block.
-// Since this last block may require padding, it is always copied to a buffer.
+// Since the last block may require padding, it is always copied to a buffer.
+// This implementation supports any SCHWAEMM instance with RATE_WORDS ==
+// CAP_WORDS and RATE_WORDS == 2*CAP_WORDS.
 
 static void rho_whi_dec_last(uint32_t *state, uint8_t *out, const uint8_t *in, \
   size_t inlen)
@@ -380,18 +365,18 @@ static void rho_whi_dec_last(uint32_t *state, uint8_t *out, const uint8_t *in, \
   uint8_t *bufptr;
   int i, j;
   
-  memcpy(buffer, in, inlen);
   if (inlen < RATE_BYTES) {  // padding
     bufptr = ((uint8_t *) buffer) + inlen;
     memcpy(bufptr, (((uint8_t *) state) + inlen), (RATE_BYTES - inlen));
     *bufptr ^= 0x80;
   }
+  memcpy(buffer, in, inlen);
   
   for (i = 0, j = RATE_WORDS/2; i < RATE_WORDS/2; i++, j++) {
     tmp1 = state[i];
     tmp2 = state[j];
     state[i] ^= state[j] ^ buffer[i] ^ state[RATE_WORDS+i];
-    state[j] = tmp1 ^ buffer[j] ^ state[RATE_WORDS+CAP_INDEX(j)];
+    state[j] = tmp1 ^ buffer[j] ^ state[(STATE_WORDS-RATE_WORDS/2)+i];
     buffer[i] ^= tmp1;
     buffer[j] ^= tmp2;
   }
@@ -411,7 +396,7 @@ void Initialize(uint32_t *state, const uint8_t *key, const uint8_t *nonce)
 {
   // load nonce into the rate-part of the state
   memcpy(state, nonce, SCHWAEMM_NONCE_BYTES);
-   // load key into the capacity-part of the sate
+  // load key into the capacity-part of the sate
   memcpy((state + RATE_WORDS), key, SCHWAEMM_KEY_BYTES);
   // execute SPARKLE with big number of steps
   sparkle(state, STATE_BRANS, STEPS_BIG);
@@ -425,9 +410,8 @@ void Initialize(uint32_t *state, const uint8_t *key, const uint8_t *nonce)
 
 void ProcessAssocData(uint32_t *state, const uint8_t *in, size_t inlen)
 {
-  // check whether `in` can be casted to uint32_t pointer (we can use here
-  // size_t instead of uintptr_t since ALIGN_OF_UI32 is either 1, 2, or 4)
-  int aligned = ((size_t) in) % ALIGN_OF_UI32 == 0;
+  // check whether `in` can be casted to uint32_t pointer
+  int aligned = ((uintptr_t) in) % (ALIGN_OF_UI32) == 0;
   // printf("Address of `in`: %p\n", in);
   
   // Main Authentication Loop
@@ -462,9 +446,8 @@ void ProcessAssocData(uint32_t *state, const uint8_t *in, size_t inlen)
 void ProcessPlainText(uint32_t *state, uint8_t *out, const uint8_t *in, \
   size_t inlen)
 {
-  // check whether `in` and `out` can be casted to uint32_t pointer (we can use
-  // here size_t instead of uintptr_t since ALIGN_OF_UI32 is either 1, 2, or 4)
-  int aligned = (((size_t) in) | ((size_t) out)) % ALIGN_OF_UI32 == 0;
+  // check whether `in` and `out` can be casted to uint32_t pointer
+  int aligned = (((uintptr_t) in) | ((uintptr_t) out)) % (ALIGN_OF_UI32) == 0;
   // printf("Address of `in` and `out`: %p, %p\n", in, out);
   
   // Main Encryption Loop
@@ -529,7 +512,7 @@ int VerifyTag(uint32_t *state, const uint8_t *tag)
   for (i = 0; i < SCHWAEMM_TAG_WORDS; i++) {
     diff |= (state[RATE_WORDS+i] ^ buffer[i]);
   }
-
+  
   return (((int) (diff == 0)) - 1);
 }
 
@@ -544,9 +527,8 @@ int VerifyTag(uint32_t *state, const uint8_t *tag)
 void ProcessCipherText(uint32_t *state, uint8_t *out, const uint8_t *in, \
   size_t inlen)
 {
-  // check whether `in` and `out` can be casted to uint32_t pointer (we can use
-  // here size_t instead of uintptr_t since ALIGN_OF_UI32 is either 1, 2, or 4)
-  int aligned = (((size_t) in) | ((size_t) out)) % ALIGN_OF_UI32 == 0;
+  // check whether `in` and `out` can be casted to uint32_t pointer
+  int aligned = (((uintptr_t) in) | ((uintptr_t) out)) % (ALIGN_OF_UI32) == 0;
   // printf("Address of `in` and `out`: %p, %p\n", in, out);
   
   // Main Decryption Loop
@@ -599,7 +581,7 @@ int crypto_aead_encrypt(UChar *c, ULLInt *clen, const UChar *m, ULLInt mlen, \
   }
   Finalize(state, k);
   GenerateTag(state, (c + msize));
-
+  
   *clen = msize;
   *clen += SCHWAEMM_TAG_BYTES;
   
