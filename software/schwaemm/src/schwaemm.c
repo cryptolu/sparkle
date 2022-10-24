@@ -225,14 +225,13 @@ static void rho_whi_aut(uint32_t *state, const uint8_t *in, int aligned)
 static void rho_whi_aut_last(uint32_t *state, const uint8_t *in, size_t inlen)
 {
   uint32_t buffer[RATE_WORDS];
-  uint8_t *bufptr;
   uint32_t tmp;
   int i, j;
   
   if (inlen < RATE_BYTES) {  // padding
-    bufptr = ((uint8_t *) buffer) + inlen;
-    memset(buffer, 0, RATE_BYTES);
-    *bufptr = 0x80;
+    i = (int) (inlen >> 2);  // start-index of 0-words
+    memset((buffer + i), 0, 4*(RATE_WORDS - i));
+    ((uint8_t *) buffer)[inlen] = 0x80;
   }
   memcpy(buffer, in, inlen);
   
@@ -292,13 +291,12 @@ static void rho_whi_enc_last(uint32_t *state, uint8_t *out, const uint8_t *in, \
 {
   uint32_t buffer[RATE_WORDS];
   uint32_t tmp1, tmp2;
-  uint8_t *bufptr;
   int i, j;
   
   if (inlen < RATE_BYTES) {  // padding
-    bufptr = ((uint8_t *) buffer) + inlen;
-    memset(buffer, 0, RATE_BYTES);
-    *bufptr = 0x80;
+    i = (int) (inlen >> 2);  // start-index of 0-words
+    memset((buffer + i), 0, 4*(RATE_WORDS - i));
+    ((uint8_t *) buffer)[inlen] = 0x80;
   }
   memcpy(buffer, in, inlen);
   
@@ -362,13 +360,12 @@ static void rho_whi_dec_last(uint32_t *state, uint8_t *out, const uint8_t *in, \
 {
   uint32_t buffer[RATE_WORDS];
   uint32_t tmp1, tmp2;
-  uint8_t *bufptr;
   int i, j;
   
   if (inlen < RATE_BYTES) {  // padding
-    bufptr = ((uint8_t *) buffer) + inlen;
-    memcpy(bufptr, (((uint8_t *) state) + inlen), (RATE_BYTES - inlen));
-    *bufptr ^= 0x80;
+    i = (int) (inlen >> 2);  // start-index of state-words
+    memcpy((buffer + i), (state + i), 4*(RATE_WORDS - i));
+    ((uint8_t *) buffer)[inlen] ^= 0x80;
   }
   memcpy(buffer, in, inlen);
   
@@ -478,13 +475,21 @@ void ProcessPlainText(uint32_t *state, uint8_t *out, const uint8_t *in, \
 void Finalize(uint32_t *state, const uint8_t *key)
 {
   uint32_t buffer[SCHWAEMM_KEY_WORDS];
-  int i;
+  uint32_t *key32;  // pointer for 32-bit access to `key`
+  // check whether `key` can be casted to uint32_t pointer
+  int i, aligned = ((uintptr_t) key) % (ALIGN_OF_UI32) == 0;
+  // printf("Address of `key`: %p\n", key);
   
-  // to prevent (potentially) unaligned memory accesses
-  memcpy(buffer, key, SCHWAEMM_KEY_BYTES);
+  if (aligned) {  // `key` can be casted to uint32_t pointer
+    key32 = (void *) key;  // casting in this way prevents a warning
+  } else {  // `key` is not sufficiently aligned for casting
+    memcpy(buffer, key, SCHWAEMM_KEY_BYTES);
+    key32 = (uint32_t *) buffer;
+  }
+  
   // add key to the capacity-part of the state
   for (i = 0; i < SCHWAEMM_KEY_WORDS; i++) {
-    state[RATE_WORDS+i] ^= buffer[i];
+    state[RATE_WORDS+i] ^= key32[i];
   }
 }
 
@@ -504,13 +509,21 @@ void GenerateTag(uint32_t *state, uint8_t *tag)
 int VerifyTag(uint32_t *state, const uint8_t *tag)
 {
   uint32_t buffer[SCHWAEMM_TAG_WORDS], diff = 0;
-  int i;
+  uint32_t *tag32;  // pointer for 32-bit access to `tag`
+  // check whether `tag` can be casted to uint32_t pointer
+  int i, aligned = ((uintptr_t) tag) % (ALIGN_OF_UI32) == 0;
+  // printf("Address of `tag`: %p\n", tag);
   
-  // to prevent (potentially) unaligned memory accesses
-  memcpy(buffer, tag, SCHWAEMM_TAG_BYTES);
+  if (aligned) {  // `tag` can be casted to uint32_t pointer
+    tag32 = (void *) tag;  // casting in this way prevents a warning
+  } else {  // `tag` is not sufficiently aligned for casting
+    memcpy(buffer, tag, SCHWAEMM_TAG_BYTES);
+    tag32 = (uint32_t *) buffer;
+  }
+  
   // constant-time comparison: 0 if equal, -1 otherwise
   for (i = 0; i < SCHWAEMM_TAG_WORDS; i++) {
-    diff |= (state[RATE_WORDS+i] ^ buffer[i]);
+    diff |= (state[RATE_WORDS+i] ^ tag32[i]);
   }
   
   return (((int) (diff == 0)) - 1);
@@ -573,10 +586,10 @@ int crypto_aead_encrypt(UChar *c, ULLInt *clen, const UChar *m, ULLInt mlen, \
   (void) nsec;  // to get rid of a warning
   
   Initialize(state, k, npub);
-  if (adsize) {
+  if (adsize > 0) {
     ProcessAssocData(state, ad, adsize);
   }
-  if (msize) {
+  if (msize > 0) {
     ProcessPlainText(state, c, m, msize);
   }
   Finalize(state, k);
@@ -604,10 +617,10 @@ int crypto_aead_decrypt(UChar *m, ULLInt *mlen, UChar *nsec, const UChar *c, \
   (void) nsec;  // to get rid of a warning
   
   Initialize(state, k, npub);
-  if (adsize) {
+  if (adsize > 0) {
     ProcessAssocData(state, ad, adsize);
   }
-  if (csize) {
+  if (csize > 0) {
     ProcessCipherText(state, m, c, csize);
   }
   Finalize(state, k);
