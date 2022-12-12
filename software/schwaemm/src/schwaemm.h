@@ -81,10 +81,10 @@ int VerifyTag(uint32_t *state, const uint8_t *tag);
 // Prototypes of the high-level functions (for benchmarking with SUPERCOP).
 
 int crypto_aead_encrypt(UChar *c, ULLInt *clen, const UChar *m, ULLInt mlen, \
-  const UChar *ad, ULLInt adlen, const UChar *nsec, const UChar *npub, \
+  const UChar *ad, ULLInt adlen, const UChar *nsec, const UChar *npub,       \
   const UChar *k);
 int crypto_aead_decrypt(UChar *m, ULLInt *mlen, UChar *nsec, const UChar *c, \
-  ULLInt clen, const UChar *ad, ULLInt adlen, const UChar *npub, \
+  ULLInt clen, const UChar *ad, ULLInt adlen, const UChar *npub,             \
   const UChar *k);
 
 #endif  // SCHWAEMM_H

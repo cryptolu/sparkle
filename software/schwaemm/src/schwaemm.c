@@ -586,15 +586,10 @@ int crypto_aead_encrypt(UChar *c, ULLInt *clen, const UChar *m, ULLInt mlen, \
   (void) nsec;  // to get rid of a warning
   
   Initialize(state, k, npub);
-  if (adsize > 0) {
-    ProcessAssocData(state, ad, adsize);
-  }
-  if (msize > 0) {
-    ProcessPlainText(state, c, m, msize);
-  }
+  if (adsize > 0) ProcessAssocData(state, ad, adsize);
+  if (msize > 0) ProcessPlainText(state, c, m, msize);
   Finalize(state, k);
   GenerateTag(state, (c + msize));
-  
   *clen = msize;
   *clen += SCHWAEMM_TAG_BYTES;
   
@@ -615,14 +610,11 @@ int crypto_aead_decrypt(UChar *m, ULLInt *mlen, UChar *nsec, const UChar *c, \
   int retval;
   
   (void) nsec;  // to get rid of a warning
+  if (clen < SCHWAEMM_TAG_BYTES) return -1;
   
   Initialize(state, k, npub);
-  if (adsize > 0) {
-    ProcessAssocData(state, ad, adsize);
-  }
-  if (csize > 0) {
-    ProcessCipherText(state, m, c, csize);
-  }
+  if (adsize > 0) ProcessAssocData(state, ad, adsize);
+  if (csize > 0) ProcessCipherText(state, m, c, csize);
   Finalize(state, k);
   retval = VerifyTag(state, (c + csize));
   *mlen = csize;
