@@ -203,7 +203,7 @@ static void rho_whi_aut(uint32_t *state, const uint8_t *in, int aligned)
   int i, j;
   
   if (aligned) {  // `in` can be casted to uint32_t pointer
-    in32 = (void *) in;  // casting in this way prevents a warning
+    in32 = (uint32_t *) (void *) in;  // to prevent cast-warning
   } else {  // `in` is not sufficiently aligned for casting
     memcpy(buffer, in, RATE_BYTES);
     in32 = (uint32_t *) buffer;
@@ -259,8 +259,8 @@ static void rho_whi_enc(uint32_t *state, uint8_t *out, const uint8_t *in, \
   int i, j;
   
   if (aligned) {  // `in` and `out` can be casted to uint32_t pointer
-    in32 = (void *) in;  // casting in this way prevents a warning
-    out32 = (void *) out;  // casting in this way prevents a warning
+    in32 = (uint32_t *) (void *) in;    // to prevent cast-warning
+    out32 = (uint32_t *) (void *) out;  // to prevent cast-warning
   } else {  // `in` or `out` is not sufficiently aligned for casting
     memcpy(buffer, in, RATE_BYTES);
     in32 = out32 = (uint32_t *) buffer;
@@ -328,8 +328,8 @@ static void rho_whi_dec(uint32_t *state, uint8_t *out, const uint8_t *in, \
   int i, j;
   
   if (aligned) {  // `in` and `out` can be casted to uint32_t pointer
-    in32 = (void *) in;  // casting in this way prevents a warning
-    out32 = (void *) out;  // casting in this way prevents a warning
+    in32 = (uint32_t *) (void *) in;    // to prevent cast-warning
+    out32 = (uint32_t *) (void *) out;  // to prevent cast-warning
   } else {  // `in` or `out` is not sufficiently aligned for casting
     memcpy(buffer, in, RATE_BYTES);
     in32 = out32 = (uint32_t *) buffer;
@@ -481,7 +481,7 @@ void Finalize(uint32_t *state, const uint8_t *key)
   // printf("Address of `key`: %p\n", key);
   
   if (aligned) {  // `key` can be casted to uint32_t pointer
-    key32 = (void *) key;  // casting in this way prevents a warning
+    key32 = (uint32_t *) (void *) key;  // to prevent cast-warning
   } else {  // `key` is not sufficiently aligned for casting
     memcpy(buffer, key, SCHWAEMM_KEY_BYTES);
     key32 = (uint32_t *) buffer;
@@ -515,7 +515,7 @@ int VerifyTag(uint32_t *state, const uint8_t *tag)
   // printf("Address of `tag`: %p\n", tag);
   
   if (aligned) {  // `tag` can be casted to uint32_t pointer
-    tag32 = (void *) tag;  // casting in this way prevents a warning
+    tag32 = (uint32_t *) (void *) tag;  // to prevent cast-warning
   } else {  // `tag` is not sufficiently aligned for casting
     memcpy(buffer, tag, SCHWAEMM_TAG_BYTES);
     tag32 = (uint32_t *) buffer;
