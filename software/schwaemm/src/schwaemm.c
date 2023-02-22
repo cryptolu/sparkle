@@ -21,14 +21,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 
-// This source code file should be compiled with the following set of flags:
-// -std=c99 -Wall -Wextra -Wshadow -fsanitize=address,undefined -O2
-
-// gencat_aead.c shall be used to generate the test vector output file. The
-// test vector output file shall be provided in the corresponding
-// crypto_aead/[algorithm]/ directory
-
-
 #include <string.h>  // for memcpy, memset
 #include "schwaemm.h"
 #include "sparkle.h"
@@ -189,195 +181,149 @@ extern void sparkle512_arm(uint32_t *state, int steps);
 
 
 // Rho and rate-whitening for the authentication of associated data. The third
-// parameter indicates whether the uint8_t-pointer `in` is properly aligned to
-// permit casting to a uint32_t-pointer. If this is the case then array `in` is
-// processed directly, otherwise it is first copied to an aligned buffer. This
-// implementation supports any SCHWAEMM instance with RATE_WORDS == CAP_WORDS
-// and RATE_WORDS == 2*CAP_WORDS.
+// parameter `bytes2buf` specifies the number of bytes of array `in` that have
+// to be copied to an aligned buffer; a value of 0 indicates that the uint8_t-
+// pointer `in` is properly aligned to permit casting to a uint32_t-pointer,
+// in which case the bytes can be directly processed (without copying them to
+// an aligned buffer). This implementation supports any SCHWAEMM instance with
+// RATE_WORDS == CAP_WORDS or RATE_WORDS == 2*CAP_WORDS.
 
-static void rho_whi_aut(uint32_t *state, const uint8_t *in, int aligned)
+static void rho_whi_aut(uint32_t *state, const uint8_t *in, int bytes2buf)
 {
-  uint32_t buffer[RATE_WORDS];
+  uint32_t buffer[RATE_WORDS+1];
+  uint32_t rw1, rw2;  // left/right rate-word
+  uint32_t dw1, dw2;  // left/right data-word
   uint32_t *in32;
-  uint32_t tmp;
-  int i, j;
+  int i;
   
-  if (aligned) {  // `in` can be casted to uint32_t pointer
+  if (bytes2buf == 0) {  // `in` can be directly processed
     in32 = (uint32_t *) (void *) in;  // to prevent cast-warning
-  } else {  // `in` is not sufficiently aligned for casting
-    memcpy(buffer, in, RATE_BYTES);
+  } else {  // bytes of array `in` are copied to (padded) buffer
+    i = (int) (bytes2buf >> 2);  // start-index of the 0-words
+    memset((buffer + i), 0, 4*(RATE_WORDS - i));
+    ((uint8_t *) buffer)[bytes2buf] = 0x80;
+    memcpy(buffer, in, bytes2buf);
     in32 = (uint32_t *) buffer;
   }
   
-  for (i = 0, j = RATE_WORDS/2; i < RATE_WORDS/2; i++, j++) {
-    tmp = state[i];
-    state[i] = state[j] ^ in32[i] ^ state[RATE_WORDS+i];
-    state[j] ^= tmp ^ in32[j] ^ state[(STATE_WORDS-RATE_WORDS/2)+i];
-  }
-}
-
-
-// Rho and rate-whitening for the authentication of the last associated-data
-// block. Since the last block may require padding, it is always copied to a
-// buffer. This implementation supports any SCHWAEMM instance with RATE_WORDS
-// == CAP_WORDS and RATE_WORDS == 2*CAP_WORDS.
-
-static void rho_whi_aut_last(uint32_t *state, const uint8_t *in, size_t inlen)
-{
-  uint32_t buffer[RATE_WORDS];
-  uint32_t tmp;
-  int i, j;
-  
-  if (inlen < RATE_BYTES) {  // padding
-    i = (int) (inlen >> 2);  // start-index of 0-words
-    memset((buffer + i), 0, 4*(RATE_WORDS - i));
-    ((uint8_t *) buffer)[inlen] = 0x80;
-  }
-  memcpy(buffer, in, inlen);
-  
-  for (i = 0, j = RATE_WORDS/2; i < RATE_WORDS/2; i++, j++) {
-    tmp = state[i];
-    state[i] = state[j] ^ buffer[i] ^ state[RATE_WORDS+i];
-    state[j] ^= tmp ^ buffer[j] ^ state[(STATE_WORDS-RATE_WORDS/2)+i];
+  for (i = 0; i < RATE_WORDS/2; i++) {
+    rw1 = state[i];
+    rw2 = state[RATE_WORDS/2+i];
+    dw1 = in32[i];
+    dw2 = in32[RATE_WORDS/2+i];
+    dw2 ^= rw2;  // part of Rho1
+    rw1 ^= dw2;  // Feistel-XOR
+    rw2 ^= dw1;  // part of Rho1
+    // Rate-Whitening + Feistel-Swap rw1 <-> rw2
+    rw2 ^= state[RATE_WORDS+i];
+    rw1 ^= state[(STATE_WORDS-RATE_WORDS/2)+i];
+    state[i] = rw2;
+    state[RATE_WORDS/2+i] = rw1; 
   }
 }
 
 
 // Rho and rate-whitening for the encryption of plaintext. The third parameter
-// indicates whether the uint8_t-pointers `in` and `out` are properly aligned
-// to permit casting to uint32_t-pointers. If this is the case then array `in`
-// and `out` are processed directly, otherwise `in` is copied to an aligned
-// buffer. This implementation supports any SCHWAEMM instance with RATE_WORDS
-// == CAP_WORDS and RATE_WORDS == 2*CAP_WORDS.
+// `bytes2buf` specifies the number of bytes of array `in` that have to be
+// copied to an aligned buffer; a value of 0 indicates that the uint8_t-pointer
+// `in` is properly aligned to permit casting to a uint32_t-pointer, in which
+// case the bytes can be directly processed (without copying them to an aligned
+// buffer). This implementation supports any SCHWAEMM instance with RATE_WORDS
+// == CAP_WORDS or RATE_WORDS == 2*CAP_WORDS.
 
 static void rho_whi_enc(uint32_t *state, uint8_t *out, const uint8_t *in, \
-  int aligned)
+  int bytes2buf)
 {
-  uint32_t buffer[RATE_WORDS];
+  uint32_t buffer[RATE_WORDS+1];
+  uint32_t rw1, rw2;  // left/right rate-word
+  uint32_t dw1, dw2;  // left/right ptxt-word
   uint32_t *in32, *out32;
-  uint32_t tmp1, tmp2;
-  int i, j;
+  int i;
   
-  if (aligned) {  // `in` and `out` can be casted to uint32_t pointer
+  if (bytes2buf == 0) {   // `in`, `out` can be directly processed
     in32 = (uint32_t *) (void *) in;    // to prevent cast-warning
     out32 = (uint32_t *) (void *) out;  // to prevent cast-warning
-  } else {  // `in` or `out` is not sufficiently aligned for casting
-    memcpy(buffer, in, RATE_BYTES);
+  } else {  // bytes of array `in` are copied to a (padded) buffer
+    i = (int) (bytes2buf >> 2);  // start-index of the 0-words
+    memset((buffer + i), 0, 4*(RATE_WORDS - i));
+    ((uint8_t *) buffer)[bytes2buf] = 0x80;
+    memcpy(buffer, in, bytes2buf);
     in32 = out32 = (uint32_t *) buffer;
   }
   
-  for (i = 0, j = RATE_WORDS/2; i < RATE_WORDS/2; i++, j++) {
-    tmp1 = state[i];
-    tmp2 = state[j];
-    state[i] = state[j] ^ in32[i] ^ state[RATE_WORDS+i];
-    state[j] ^= tmp1 ^ in32[j] ^ state[(STATE_WORDS-RATE_WORDS/2)+i];
-    out32[i] = in32[i] ^ tmp1;
-    out32[j] = in32[j] ^ tmp2;
+  for (i = 0; i < RATE_WORDS/2; i++) {
+    rw1 = state[i];
+    rw2 = state[RATE_WORDS/2+i];
+    dw1 = in32[i];
+    dw2 = in32[RATE_WORDS/2+i];
+    dw2 ^= rw2;  // part of Rho2
+    rw2 ^= dw1;  // part of Rho1
+    dw1 ^= rw1;  // part of Rho2
+    rw1 ^= dw2;  // part of Rho1 + Feistel-XOR
+    out32[i] = dw1;
+    out32[RATE_WORDS/2+i] = dw2;
+    // Rate-Whitening + Feistel-Swap rw1 <-> rw2
+    rw2 ^= state[RATE_WORDS+i];
+    rw1 ^= state[(STATE_WORDS-RATE_WORDS/2)+i];
+    state[i] = rw2;
+    state[RATE_WORDS/2+i] = rw1;
   }
   
-  if (!aligned) {
-    memcpy(out, buffer, RATE_BYTES);
-  }
-}
-
-
-// Rho and rate-whitening for the encryption of the last plaintext block. Since
-// the last block may require padding, it is always copied to a buffer. This
-// implementation supports any SCHWAEMM instance with RATE_WORDS == CAP_WORDS
-// and RATE_WORDS == 2*CAP_WORDS.
-
-static void rho_whi_enc_last(uint32_t *state, uint8_t *out, const uint8_t *in, \
-  size_t inlen)
-{
-  uint32_t buffer[RATE_WORDS];
-  uint32_t tmp1, tmp2;
-  int i, j;
-  
-  if (inlen < RATE_BYTES) {  // padding
-    i = (int) (inlen >> 2);  // start-index of 0-words
-    memset((buffer + i), 0, 4*(RATE_WORDS - i));
-    ((uint8_t *) buffer)[inlen] = 0x80;
-  }
-  memcpy(buffer, in, inlen);
-  
-  for (i = 0, j = RATE_WORDS/2; i < RATE_WORDS/2; i++, j++) {
-    tmp1 = state[i];
-    tmp2 = state[j];
-    state[i] = state[j] ^ buffer[i] ^ state[RATE_WORDS+i];
-    state[j] ^= tmp1 ^ buffer[j] ^ state[(STATE_WORDS-RATE_WORDS/2)+i];
-    buffer[i] ^= tmp1;
-    buffer[j] ^= tmp2;
-  }
-  memcpy(out, buffer, inlen);
+  if (bytes2buf) memcpy(out, buffer, bytes2buf);
 }
 
 
 // Rho and rate-whitening for the decryption of ciphertext. The third parameter
-// indicates whether the uint8_t-pointers `in` and `out` are properly aligned
-// to permit casting to uint32_t-pointers. If this is the case then array `in`
-// and `out` are processed directly, otherwise `in` is copied to an aligned
-// buffer. This implementation supports any SCHWAEMM instance with RATE_WORDS
-// == CAP_WORDS and RATE_WORDS == 2*CAP_WORDS.
+// `bytes2buf` specifies the number of bytes of array `in` that have to be
+// copied to an aligned buffer; a value of 0 indicates that the uint8_t-pointer
+// `in` is properly aligned to permit casting to a uint32_t-pointer, in which
+// case the bytes can be directly processed (without copying them to an aligned
+// buffer). This implementation supports any SCHWAEMM instance with RATE_WORDS
+// == CAP_WORDS or RATE_WORDS == 2*CAP_WORDS. Instead of padding the last block
+// with 0-bytes, we pad it with the corresponding state-bytes since, in this
+// way, the rho'1 function for decryption (see specification Section 2.3.2) can
+// omit the XOR of the state. Thanks to this small modification of the padding,
+// the rho and rate-whitening for decryption is equally fast as for encryption.
 
 static void rho_whi_dec(uint32_t *state, uint8_t *out, const uint8_t *in, \
-  int aligned)
+  int bytes2buf)
 {
-  uint32_t buffer[RATE_WORDS];
+  uint32_t buffer[RATE_WORDS+1];
+  uint32_t rw1, rw2;  // left/right rate-word
+  uint32_t dw1, dw2;  // left/right ctxt-word
   uint32_t *in32, *out32;
-  uint32_t tmp1, tmp2;
-  int i, j;
+  int i;
   
-  if (aligned) {  // `in` and `out` can be casted to uint32_t pointer
+  if (bytes2buf == 0) {   // `in`, `out` can be directly processed
     in32 = (uint32_t *) (void *) in;    // to prevent cast-warning
     out32 = (uint32_t *) (void *) out;  // to prevent cast-warning
-  } else {  // `in` or `out` is not sufficiently aligned for casting
-    memcpy(buffer, in, RATE_BYTES);
+  } else {  // bytes of array `in` are copied to a (padded) buffer
+    i = (int) (bytes2buf >> 2);  // start-index of the state-words
+    memcpy((buffer + i), (state + i), 4*(RATE_WORDS - i));
+    ((uint8_t *) buffer)[bytes2buf] ^= 0x80;
+    memcpy(buffer, in, bytes2buf);
     in32 = out32 = (uint32_t *) buffer;
   }
   
-  for (i = 0, j = RATE_WORDS/2; i < RATE_WORDS/2; i++, j++) {
-    tmp1 = state[i];
-    tmp2 = state[j];
-    state[i] ^= state[j] ^ in32[i] ^ state[RATE_WORDS+i];
-    state[j] = tmp1 ^ in32[j] ^ state[(STATE_WORDS-RATE_WORDS/2)+i];
-    out32[i] = in32[i] ^ tmp1;
-    out32[j] = in32[j] ^ tmp2;
+  for (i = 0; i < RATE_WORDS/2; i++) {
+    rw1 = state[i];
+    rw2 = state[RATE_WORDS/2+i];
+    dw1 = in32[i];
+    dw2 = in32[RATE_WORDS/2+i];
+    dw1 ^= rw1;  // part of Rho2
+    rw1 ^= dw2;  // part of Rho1 + Feistel-XOR
+    dw2 ^= rw2;  // part of Rho2
+    rw2 ^= dw1;  // part of Rho1
+    out32[i] = dw1;
+    out32[RATE_WORDS/2+i] = dw2;
+    // Rate-Whitening + Feistel-Swap rw1 <-> rw2
+    rw2 ^= state[RATE_WORDS+i];
+    rw1 ^= state[(STATE_WORDS-RATE_WORDS/2)+i];
+    state[i] = rw2;
+    state[RATE_WORDS/2+i] = rw1;
   }
   
-  if (!aligned) {
-    memcpy(out, buffer, RATE_BYTES);
-  }
-}
-
-
-// Rho and rate-whitening for the decryption of the last ciphertext block.
-// Since the last block may require padding, it is always copied to a buffer.
-// This implementation supports any SCHWAEMM instance with RATE_WORDS ==
-// CAP_WORDS and RATE_WORDS == 2*CAP_WORDS.
-
-static void rho_whi_dec_last(uint32_t *state, uint8_t *out, const uint8_t *in, \
-  size_t inlen)
-{
-  uint32_t buffer[RATE_WORDS];
-  uint32_t tmp1, tmp2;
-  int i, j;
-  
-  if (inlen < RATE_BYTES) {  // padding
-    i = (int) (inlen >> 2);  // start-index of state-words
-    memcpy((buffer + i), (state + i), 4*(RATE_WORDS - i));
-    ((uint8_t *) buffer)[inlen] ^= 0x80;
-  }
-  memcpy(buffer, in, inlen);
-  
-  for (i = 0, j = RATE_WORDS/2; i < RATE_WORDS/2; i++, j++) {
-    tmp1 = state[i];
-    tmp2 = state[j];
-    state[i] ^= state[j] ^ buffer[i] ^ state[RATE_WORDS+i];
-    state[j] = tmp1 ^ buffer[j] ^ state[(STATE_WORDS-RATE_WORDS/2)+i];
-    buffer[i] ^= tmp1;
-    buffer[j] ^= tmp2;
-  }
-  memcpy(out, buffer, inlen);
+  if (bytes2buf) memcpy(out, buffer, bytes2buf);
 }
 
 
@@ -407,15 +353,18 @@ void Initialize(uint32_t *state, const uint8_t *key, const uint8_t *nonce)
 
 void ProcessAssocData(uint32_t *state, const uint8_t *in, size_t inlen)
 {
-  // check whether `in` can be casted to uint32_t pointer
+  // check whether `in` can be casted to a uint32_t pointer
   int aligned = ((uintptr_t) in) % (ALIGN_OF_UI32) == 0;
-  // printf("Address of `in`: %p\n", in);
+  // `bytes2buf` is the number of bytes that `rho_whi_aut` has to copy to an
+  // aligned buffer; it is 0 when `in` is aligned to permit direct processing
+  // (w/o copying to a buffer) by casting it to a uint32_t pointer
+  int bytes2buf = (aligned) ? 0 : RATE_BYTES;
   
   // Main Authentication Loop
   
   while (inlen > RATE_BYTES) {
     // combined Rho and rate-whitening operation
-    rho_whi_aut(state, in, aligned);
+    rho_whi_aut(state, in, bytes2buf);
     // execute SPARKLE with slim number of steps
     sparkle(state, STATE_BRANS, STEPS_SLIM);
     inlen -= RATE_BYTES;
@@ -424,10 +373,14 @@ void ProcessAssocData(uint32_t *state, const uint8_t *in, size_t inlen)
   
   // Authentication of Last Block
   
-  // addition of constant A0 or A1 to the state
-  state[STATE_WORDS-1] ^= ((inlen < RATE_BYTES) ? CONST_A0 : CONST_A1);
-  // combined Rho and rate-whitening (incl. padding)
-  rho_whi_aut_last(state, in, inlen);
+  if (inlen == RATE_BYTES) {
+    state[STATE_WORDS-1] ^= CONST_A1;
+  } else {  // inlen < RATE_BYTES
+    state[STATE_WORDS-1] ^= CONST_A0;
+    bytes2buf = (int) inlen;
+  }
+  // combined Rho and rate-whitening operation
+  rho_whi_aut(state, in, bytes2buf);
   // execute SPARKLE with big number of steps
   sparkle(state, STATE_BRANS, STEPS_BIG);
 }
@@ -443,15 +396,18 @@ void ProcessAssocData(uint32_t *state, const uint8_t *in, size_t inlen)
 void ProcessPlainText(uint32_t *state, uint8_t *out, const uint8_t *in, \
   size_t inlen)
 {
-  // check whether `in` and `out` can be casted to uint32_t pointer
+  // check whether `in` and `out` can be casted to uint32_t pointers
   int aligned = (((uintptr_t) in) | ((uintptr_t) out)) % (ALIGN_OF_UI32) == 0;
-  // printf("Address of `in` and `out`: %p, %p\n", in, out);
+  // `bytes2buf` is the number of bytes that `rho_whi_enc` has to copy to an
+  // aligned buffer; it is 0 when `in` and `out` are aligned to permit direct
+  // processing (w/o copying to a buffer) by casting them to uint32_t pointers
+  int bytes2buf = (aligned) ? 0 : RATE_BYTES;
   
   // Main Encryption Loop
   
   while (inlen > RATE_BYTES) {
     // combined Rho and rate-whitening operation
-    rho_whi_enc(state, out, in, aligned);
+    rho_whi_enc(state, out, in, bytes2buf);
     // execute SPARKLE with slim number of steps
     sparkle(state, STATE_BRANS, STEPS_SLIM);
     inlen -= RATE_BYTES;
@@ -461,10 +417,14 @@ void ProcessPlainText(uint32_t *state, uint8_t *out, const uint8_t *in, \
   
   // Encryption of Last Block
   
-  // addition of constant M2 or M3 to the state
-  state[STATE_WORDS-1] ^= ((inlen < RATE_BYTES) ? CONST_M2 : CONST_M3);
-  // combined Rho and rate-whitening (incl. padding)
-  rho_whi_enc_last(state, out, in, inlen);
+  if (inlen == RATE_BYTES) {
+    state[STATE_WORDS-1] ^= CONST_M3;
+  } else {  // inlen < RATE_BYTES
+    state[STATE_WORDS-1] ^= CONST_M2;
+    bytes2buf = (int) inlen;
+  }
+  // combined Rho and rate-whitening operation
+  rho_whi_enc(state, out, in, bytes2buf);
   // execute SPARKLE with big number of steps
   sparkle(state, STATE_BRANS, STEPS_BIG);
 }
@@ -478,7 +438,6 @@ void Finalize(uint32_t *state, const uint8_t *key)
   uint32_t *key32;  // pointer for 32-bit access to `key`
   // check whether `key` can be casted to uint32_t pointer
   int i, aligned = ((uintptr_t) key) % (ALIGN_OF_UI32) == 0;
-  // printf("Address of `key`: %p\n", key);
   
   if (aligned) {  // `key` can be casted to uint32_t pointer
     key32 = (uint32_t *) (void *) key;  // to prevent cast-warning
@@ -512,7 +471,6 @@ int VerifyTag(uint32_t *state, const uint8_t *tag)
   uint32_t *tag32;  // pointer for 32-bit access to `tag`
   // check whether `tag` can be casted to uint32_t pointer
   int i, aligned = ((uintptr_t) tag) % (ALIGN_OF_UI32) == 0;
-  // printf("Address of `tag`: %p\n", tag);
   
   if (aligned) {  // `tag` can be casted to uint32_t pointer
     tag32 = (uint32_t *) (void *) tag;  // to prevent cast-warning
@@ -540,15 +498,18 @@ int VerifyTag(uint32_t *state, const uint8_t *tag)
 void ProcessCipherText(uint32_t *state, uint8_t *out, const uint8_t *in, \
   size_t inlen)
 {
-  // check whether `in` and `out` can be casted to uint32_t pointer
+  // check whether `in` and `out` can be casted to uint32_t pointers
   int aligned = (((uintptr_t) in) | ((uintptr_t) out)) % (ALIGN_OF_UI32) == 0;
-  // printf("Address of `in` and `out`: %p, %p\n", in, out);
+  // `bytes2buf` is the number of bytes that `rho_whi_dec` has to copy to an
+  // aligned buffer; it is 0 when `in` and `out` are aligned to permit direct
+  // processing (w/o copying to a buffer) by casting them to uint32_t pointers
+  int bytes2buf = (aligned) ? 0 : RATE_BYTES;
   
   // Main Decryption Loop
   
   while (inlen > RATE_BYTES) {
     // combined Rho and rate-whitening operation
-    rho_whi_dec(state, out, in, aligned);
+    rho_whi_dec(state, out, in, bytes2buf);
     // execute SPARKLE with slim number of steps
     sparkle(state, STATE_BRANS, STEPS_SLIM);
     inlen -= RATE_BYTES;
@@ -558,10 +519,14 @@ void ProcessCipherText(uint32_t *state, uint8_t *out, const uint8_t *in, \
   
   // Decryption of Last Block
   
-  // addition of constant M2 or M3 to the state
-  state[STATE_WORDS-1] ^= ((inlen < RATE_BYTES) ? CONST_M2 : CONST_M3);
-  // combined Rho and rate-whitening (incl. padding)
-  rho_whi_dec_last(state, out, in, inlen);
+  if (inlen == RATE_BYTES) {
+    state[STATE_WORDS-1] ^= CONST_M3;
+  } else {  // inlen < RATE_BYTES
+    state[STATE_WORDS-1] ^= CONST_M2;
+    bytes2buf = (int) inlen;
+  }
+  // combined Rho and rate-whitening operation
+  rho_whi_dec(state, out, in, bytes2buf);
   // execute SPARKLE with big number of steps
   sparkle(state, STATE_BRANS, STEPS_BIG);
 }
